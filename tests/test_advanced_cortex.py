@@ -212,3 +212,28 @@ def test_raw_retention_days_cleanup(test_env):
     assert report["pruned_raw_episodes"] == 1
     # Only 1 fresh episode should remain
     assert stream.count() == 1
+
+def test_autonomic_background_consolidation(test_env):
+    """Verifies that appending episodes beyond threshold automatically triggers consolidation in background."""
+    config, db = test_env
+    config.consolidation_turn_interval = 3
+    config.auto_consolidate = True
+
+    stream = StreamBuffer(db, config=config, auto_consolidate=True)
+
+    # Append 3 episodes (hitting the threshold)
+    stream.append("git push", result="rejected", status=ActionStatus.FAILURE)
+    stream.append("git push", result="rejected", status=ActionStatus.FAILURE)
+    stream.append("git push --force-with-lease", result="pushed", status=ActionStatus.SUCCESS)
+
+    # Allow worker thread up to 2 seconds to complete autonomic sleep
+    deadline = time.time() + 2.0
+    while time.time() < deadline:
+        if len(stream.get_unconsolidated()) == 0:
+            break
+        time.sleep(0.05)
+
+    # Must be consolidated without any manual sleep call!
+    assert len(stream.get_unconsolidated()) == 0
+    assert stream.count() == 3
+

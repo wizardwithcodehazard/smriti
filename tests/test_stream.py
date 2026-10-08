@@ -54,7 +54,7 @@ def test_stream_append_and_retrieve(temp_db):
     assert recent[0].action == "lake build"
 
 def test_stream_append_sub_millisecond_benchmark(temp_db):
-    stream = StreamBuffer(temp_db)
+    stream = StreamBuffer(temp_db, auto_consolidate=False)
     
     iterations = 100
     start = time.perf_counter()

@@ -29,7 +29,8 @@ class SmritiConfig:
     embedding_model: str = "BAAI/bge-small-en-v1.5"
 
     # Consolidation thresholds
-    consolidation_turn_interval: int = 15
+    consolidation_turn_interval: int = 5
+    auto_consolidate: bool = True
     raw_retention_days: int = 7
 
     @property

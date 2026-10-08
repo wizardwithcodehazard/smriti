@@ -1,22 +1,34 @@
 """
 stream.py - Tier 1: Sub-millisecond Episodic Working Buffer (Hippocampal stream).
 Append-only, transaction-safe SQLite WAL stream with zero LLM overhead.
-Supports unconsolidated queries, batch consolidation marking, and retention sweeps.
+Supports unconsolidated queries, batch consolidation marking, retention sweeps,
+and autonomic background sleep cycles triggered by turn thresholds.
 """
 
 import json
 import logging
+import threading
 import time
 from typing import Any
 
+from smriti.config import SmritiConfig, get_config
 from smriti.models import ActionStatus, Episode
 from smriti.storage.db import DatabaseManager, get_db
 
 logger = logging.getLogger(__name__)
 
 class StreamBuffer:
-    def __init__(self, db: DatabaseManager | None = None):
-        self.db = db or get_db()
+    def __init__(
+        self,
+        db: DatabaseManager | None = None,
+        config: SmritiConfig | None = None,
+        auto_consolidate: bool = True
+    ):
+        self.config = config or get_config()
+        self.db = db or get_db(self.config)
+        self.auto_consolidate = auto_consolidate and self.config.auto_consolidate
+        self._consolidating = False
+        self._consolidate_lock = threading.Lock()
 
     def append(
         self,
@@ -31,6 +43,8 @@ class StreamBuffer:
         """
         Appends an action trajectory into the episodic buffer in sub-millisecond time.
         Zero LLM latency, zero graph blocking.
+        Autonomously fires a non-blocking background consolidation cycle if the
+        unconsolidated turn threshold is reached.
         """
         episode = Episode(
             session_id=session_id,
@@ -66,7 +80,55 @@ class StreamBuffer:
                 )
             )
 
+        # Autonomic background sleep threshold check
+        if self.auto_consolidate:
+            self._check_and_trigger_auto_consolidation(session_id)
+
         return episode
+
+    def _check_and_trigger_auto_consolidation(self, session_id: str | None = None) -> None:
+        """Checks if unconsolidated episode count exceeds threshold and fires background worker."""
+        try:
+            conn = self.db.get_connection()
+            cur = conn.execute("SELECT COUNT(*) FROM episodes WHERE consolidated_at IS NULL")
+            unconsolidated_count = cur.fetchone()[0]
+            if unconsolidated_count >= self.config.consolidation_turn_interval:
+                self._start_background_consolidation(session_id)
+        except Exception as e:
+            logger.debug("Auto-consolidation threshold check error: %s", e)
+
+    def _start_background_consolidation(self, session_id: str | None = None) -> None:
+        """Launches a daemon worker thread to run consolidation without blocking write path."""
+        with self._consolidate_lock:
+            if self._consolidating:
+                return
+            self._consolidating = True
+
+        def _worker():
+            try:
+                from smriti.engine.consolidator import Consolidator
+                consolidator = Consolidator(db=self.db, config=self.config, stream=self)
+                report = consolidator.sleep(session_id=session_id)
+                logger.info(
+                    "Autonomic background consolidation complete: %d episodes, %d anti-memories, %d rules",
+                    report.get("processed_episodes", 0),
+                    report.get("promoted_anti_memories", 0),
+                    report.get("promoted_positive_rules", 0)
+                )
+            except Exception as e:
+                logger.warning("Background consolidation failed: %s", e)
+            finally:
+                with self._consolidate_lock:
+                    self._consolidating = False
+
+        thread = threading.Thread(target=_worker, name="SmritiAutonomicSleep", daemon=True)
+        self._active_worker = thread
+        thread.start()
+
+    def wait_for_consolidation(self, timeout: float = 3.0) -> None:
+        """Blocks until the active background consolidation completes, up to timeout seconds."""
+        if hasattr(self, "_active_worker") and self._active_worker is not None and self._active_worker.is_alive():
+            self._active_worker.join(timeout=timeout)
 
     def get_recent(self, limit: int = 50, session_id: str | None = None) -> list[Episode]:
         """Retrieves recent episodes ordered chronologically descending."""
@@ -103,7 +165,6 @@ class StreamBuffer:
             return 0
         conn = self.db.get_connection()
         with conn:
-            # Batch update using chunks if needed
             placeholders = ",".join(["?"] * len(episode_ids))
             cur = conn.execute(
                 f"UPDATE episodes SET consolidated_at = ? WHERE id IN ({placeholders})",
