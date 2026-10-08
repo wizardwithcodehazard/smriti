@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "smriti"
+name = "smruti"
 version = "0.1.0"
 description = "A Biologically Inspired, Dual-Valence Cognitive Memory Engine for Autonomous AI Agents"
 readme = "README.md"
@@ -25,10 +25,10 @@ dev = [
 ]
 
 [project.scripts]
-smriti = "smriti.interfaces.cli:app"
+smruti = "smruti.interfaces.cli:app"
 
 [tool.hatch.build.targets.wheel]
-packages = ["smriti"]
+packages = ["smruti"]
 
 [tool.ruff]
 line-length = 100

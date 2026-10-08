@@ -1,1 +1,1 @@
-"""Unit tests for Smriti test suite."""
+"""Unit tests for smruti test suite."""

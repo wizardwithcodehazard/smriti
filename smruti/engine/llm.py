@@ -1,5 +1,5 @@
 """
-llm.py - Extensible LLM Brain Interface for Smriti.
+llm.py - Extensible LLM Brain Interface for smruti.
 Provides optional neural LLM arbitration during preflight and knowledge distillation during sleep cycles.
 Gracefully supports OpenAI, Anthropic, or local HTTP models with zero-dependency heuristic fallbacks.
 """
@@ -9,7 +9,7 @@ import logging
 import os
 from typing import Any
 
-from smriti.models import AntiMemory
+from smruti.models import AntiMemory
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +21,8 @@ class LLMClient:
         base_url: str | None = None
     ):
         self.api_key = api_key or os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
-        self.model = model or os.getenv("SMRITI_LLM_MODEL") or "gpt-4o-mini"
-        self.base_url = base_url or os.getenv("SMRITI_LLM_BASE_URL")
+        self.model = model or os.getenv("smruti_LLM_MODEL") or "gpt-4o-mini"
+        self.base_url = base_url or os.getenv("smruti_LLM_BASE_URL")
 
     def is_configured(self) -> bool:
         """Returns True if an LLM key or local endpoint is configured."""

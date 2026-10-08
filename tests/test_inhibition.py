@@ -7,15 +7,15 @@ from pathlib import Path
 
 import pytest
 
-from smriti.config import SmritiConfig
-from smriti.engine.inhibitory import InhibitoryGate
-from smriti.storage.db import DatabaseManager
+from smruti.config import smrutiConfig
+from smruti.engine.inhibitory import InhibitoryGate
+from smruti.storage.db import DatabaseManager
 
 
 @pytest.fixture
 def gate():
     with tempfile.TemporaryDirectory() as tmpdir:
-        config = SmritiConfig(
+        config = smrutiConfig(
             project_dir=Path(tmpdir),
             db_filename="test_inhibition.db"
         )

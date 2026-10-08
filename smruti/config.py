@@ -1,6 +1,6 @@
 """
-config.py - Dynamic environment and runtime configuration for Smriti.
-Discovers local .smriti/ directory or falls back to user home directory.
+config.py - Dynamic environment and runtime configuration for smruti.
+Discovers local .smruti/ directory or falls back to user home directory.
 """
 
 from dataclasses import dataclass
@@ -8,11 +8,11 @@ from pathlib import Path
 
 
 @dataclass
-class SmritiConfig:
+class smrutiConfig:
     # Storage settings
-    db_filename: str = "smriti.db"
+    db_filename: str = "smruti.db"
     project_dir: Path = Path.cwd()
-    smriti_dir_name: str = ".smriti"
+    smruti_dir_name: str = ".smruti"
     
     # Biological decay parameters
     # decay_rate: controls how fast unused rules decay over time (in hours^-1)
@@ -33,19 +33,26 @@ class SmritiConfig:
     auto_consolidate: bool = True
     raw_retention_days: int = 7
 
+    # Pluggable Storage Backend (sqlite / postgres)
+    backend_type: str = "sqlite"
+    postgres_url: str | None = None
+
+
     @property
-    def smriti_dir(self) -> Path:
-        """Finds .smriti in current working directory or ancestors, else creates in cwd."""
+    def smruti_dir(self) -> Path:
+        """Finds .smruti in current working directory or ancestors, else creates in cwd."""
         current = self.project_dir.resolve()
         for parent in [current, *current.parents]:
-            candidate = parent / self.smriti_dir_name
+            candidate = parent / self.smruti_dir_name
             if candidate.is_dir():
                 return candidate
-        return current / self.smriti_dir_name
+        return current / self.smruti_dir_name
 
     @property
     def db_path(self) -> Path:
-        return self.smriti_dir / self.db_filename
+        return self.smruti_dir / self.db_filename
 
-def get_config() -> SmritiConfig:
-    return SmritiConfig()
+def get_config() -> smrutiConfig:
+    return smrutiConfig()
+
+SmrutiConfig = smrutiConfig

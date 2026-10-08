@@ -1,4 +1,4 @@
-# Smriti (स्मृति) — Technical Implementation Specification
+# smruti (स्मृति) — Technical Implementation Specification
 
 > **A Biologically Inspired, Dual-Valence Cognitive Memory Engine for Autonomous AI Agents**
 > *Bridging fast episodic buffering, offline consolidation, inhibitory anti-memories, and synaptic decay.*
@@ -14,7 +14,7 @@ Current AI memory solutions (Cognee, Mem0, Zep, GraphRAG) approach agent memory 
 3. **Absence of Negative Knowledge (Anti-Memories):** Existing engines only store positive assertions (`X is Y`). They cannot represent failure trajectories, resulting in agents repeating identical mistakes, syntax errors, or compiler dead ends across sessions.
 4. **Static Flat Weighting:** A file or note ingested months ago holds the exact same retrieval weight as a fact recalled two minutes ago. There is no biological forgetting curve or reinforcement mechanism.
 
-**Smriti** replaces this paradigm with a biological, dual-valence memory engine built on three decoupled tiers.
+**smruti** replaces this paradigm with a biological, dual-valence memory engine built on three decoupled tiers.
 
 ---
 
@@ -82,13 +82,13 @@ Current AI memory solutions (Cognee, Mem0, Zep, GraphRAG) approach agent memory 
 ## 4. Package & Directory Structure
 
 ```text
-smriti/
+smruti/
 ├── pyproject.toml              # Project dependencies: fastmcp, typer, pydantic, fastembed
 ├── README.md                   # Quickstart, architecture overview, and MCP configuration
 ├── implementation.md           # Technical specification and mathematical/logical models
 ├── tasks.md                    # Actionable task tracking and milestone progress
-├── smriti/
-│   ├── __init__.py             # Public Python API: SmritiEngine, Guard
+├── smruti/
+│   ├── __init__.py             # Public Python API: smrutiEngine, Guard
 │   ├── config.py               # Database paths, decay half-life, thresholds
 │   ├── models.py               # Pydantic schemas (Episode, AntiMemory, Rule, Valence)
 │   ├── storage/
@@ -103,7 +103,7 @@ smriti/
 │   ├── interfaces/
 │   │   ├── __init__.py
 │   │   ├── mcp_server.py       # FastMCP Server (stdio tools for AI coding assistants)
-│   │   └── cli.py              # Typer CLI (smriti init, inspect, sleep, audit)
+│   │   └── cli.py              # Typer CLI (smruti init, inspect, sleep, audit)
 └── tests/
     ├── test_stream.py          # Sub-ms append benchmark & schema checks
     ├── test_inhibition.py      # Preflight interception verification
@@ -178,14 +178,14 @@ An inhibitory anti-memory matches an action candidate if:
 
 ### Interface A: FastMCP Server
 Equips AI IDEs (Cursor, Claude Code, Antigravity) with four native tools over stdio:
-1. `smriti_preflight_check(action, context)`: Intercepts actions before execution.
-2. `smriti_record_episode(action, outcome, status, latency_ms)`: Logs execution results into Tier 1.
-3. `smriti_recall_heuristics(query, limit)`: Injects top-weighted positive rules into working memory.
-4. `smriti_trigger_sleep()`: Runs the consolidation cycle.
+1. `smruti_preflight_check(action, context)`: Intercepts actions before execution.
+2. `smruti_record_episode(action, outcome, status, latency_ms)`: Logs execution results into Tier 1.
+3. `smruti_recall_heuristics(query, limit)`: Injects top-weighted positive rules into working memory.
+4. `smruti_trigger_sleep()`: Runs the consolidation cycle.
 
 ### Interface B: Typer CLI
 Provides developers with terminal inspection and manual management:
-- `smriti init`: Initializes `.smriti/` database in the current project root.
-- `smriti status`: Displays active positive rules, anti-memories, and decay health.
-- `smriti sleep`: Forces memory consolidation over uncompacted episodes.
-- `smriti audit`: Shows chronological trajectory logs and blocked dead ends.
+- `smruti init`: Initializes `.smruti/` database in the current project root.
+- `smruti status`: Displays active positive rules, anti-memories, and decay health.
+- `smruti sleep`: Forces memory consolidation over uncompacted episodes.
+- `smruti audit`: Shows chronological trajectory logs and blocked dead ends.

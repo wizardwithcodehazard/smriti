@@ -8,7 +8,7 @@ import sqlite3
 import threading
 from datetime import datetime, timezone
 
-from smriti.config import SmritiConfig, get_config
+from smruti.config import smrutiConfig, get_config
 
 logger = logging.getLogger(__name__)
 
@@ -105,11 +105,19 @@ MIGRATIONS = [
         [
             "ALTER TABLE anti_memories ADD COLUMN embedding TEXT;",
         ]
+    ),
+    (
+        4,
+        "Add expires_at TTL column to anti_memories for temporal decay",
+        [
+            "ALTER TABLE anti_memories ADD COLUMN expires_at REAL;",
+            "CREATE INDEX IF NOT EXISTS idx_anti_memories_expires ON anti_memories(expires_at);",
+        ]
     )
 ]
 
 class DatabaseManager:
-    def __init__(self, config: SmritiConfig | None = None):
+    def __init__(self, config: smrutiConfig | None = None):
         self.config = config or get_config()
         self._local = threading.local()
         self._lock = threading.Lock()
@@ -117,8 +125,8 @@ class DatabaseManager:
         self._ensure_storage()
 
     def _ensure_storage(self) -> None:
-        """Ensures .smriti directory, WAL mode, and migrations are applied."""
-        self.config.smriti_dir.mkdir(parents=True, exist_ok=True)
+        """Ensures .smruti directory, WAL mode, and migrations are applied."""
+        self.config.smruti_dir.mkdir(parents=True, exist_ok=True)
         conn = self.get_connection()
         with self._lock:
             conn.execute("PRAGMA journal_mode = WAL;")
@@ -164,12 +172,18 @@ class DatabaseManager:
     def get_connection(self) -> sqlite3.Connection:
         """Returns a thread-local persistent connection for maximum throughput."""
         if not hasattr(self._local, "conn") or self._local.conn is None:
+            self.config.smruti_dir.mkdir(parents=True, exist_ok=True)
             conn = sqlite3.connect(
                 str(self.config.db_path),
                 timeout=10.0,
                 check_same_thread=False
             )
+
             conn.row_factory = sqlite3.Row
+            # Retry writes internally for up to 5s before raising OperationalError
+            conn.execute("PRAGMA busy_timeout = 5000;")
+            # Increase page cache to 8 MB (default is 2 MB)
+            conn.execute("PRAGMA cache_size = -8000;")
             self._local.conn = conn
             with self._lock:
                 self._all_conns.append(conn)
@@ -198,7 +212,7 @@ _default_db: DatabaseManager | None = None
 _db_managers: dict[str, DatabaseManager] = {}
 _db_lock = threading.Lock()
 
-def get_db(config: SmritiConfig | None = None) -> DatabaseManager:
+def get_db(config: smrutiConfig | None = None) -> DatabaseManager:
     """Thread-safe factory that caches DatabaseManager instances per database path."""
     global _default_db
     if _default_db is not None and config is None:

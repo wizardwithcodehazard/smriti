@@ -14,13 +14,50 @@ import re
 from collections.abc import Callable
 from datetime import datetime, timezone
 
-from smriti.models import AntiMemory, InhibitionResult, ValenceType
-from smriti.storage.db import DatabaseManager, get_db
-from smriti.storage.embeddings import EmbeddingEngine, get_embedding_engine
+from smruti.models import AntiMemory, InhibitionResult, ValenceType
+from smruti.storage.db import DatabaseManager, get_db
+from smruti.storage.embeddings import EmbeddingEngine, get_embedding_engine
 
 logger = logging.getLogger(__name__)
 
 REGEX_CHARS = set(r"^$.*+?{}[]\|()")
+
+# First tokens that strongly signal a non-mutating, read-only operation.
+# These bypass destructive anti-memories unless similarity is extremely high (>=0.95).
+_READ_ONLY_VERBS: frozenset[str] = frozenset({
+    # SQL read
+    "select", "with",
+    # HTTP read
+    "get",
+    # Shell inspection
+    "ls", "ll", "dir", "cat", "bat", "less", "more", "head", "tail",
+    "grep", "rg", "find", "locate", "which", "whereis", "type",
+    "stat", "file", "wc", "diff", "md5sum", "sha256sum",
+    "describe", "explain", "show", "inspect", "info", "status",
+    "ps", "top", "htop", "df", "du", "lsof", "netstat", "ss",
+    "ping", "traceroute", "nslookup", "dig",
+    "echo", "print", "printf", "pwd", "env", "printenv",
+    "git log", "git status", "git diff", "git show", "git branch",
+    # Python/Node inspection
+    "python -c", "node -e",
+    # Docker read
+    "docker ps", "docker images", "docker logs", "docker inspect",
+})
+
+_READ_ONLY_THRESHOLD = 0.95  # Much stricter semantic threshold for read-only actions
+
+
+def _is_read_only_intent(action: str) -> bool:
+    """Returns True if the action's first verb strongly signals a non-mutating read operation."""
+    lower = action.strip().lower()
+    # Check two-token prefixes first (e.g. "git log", "docker ps")
+    for verb in _READ_ONLY_VERBS:
+        if " " in verb and lower.startswith(verb):
+            return True
+    # Single-token first word
+    first_word = lower.split()[0] if lower.split() else ""
+    return first_word in _READ_ONLY_VERBS
+
 
 class InhibitoryGate:
     def __init__(
@@ -44,12 +81,17 @@ class InhibitoryGate:
         suggested_fix: str | None = None,
         context_tags: list[str] | None = None,
         severity: str = "high",
-        project_root: str | None = None
+        project_root: str | None = None,
+        expires_at: float | None = None,
+        expires_in_days: float | None = None,
     ) -> AntiMemory:
-        """Records or updates a known failure signature with dense vector embeddings and project scoping."""
+        """Records or updates a known failure signature with dense vector embeddings, project scoping, and TTL."""
         clean_sig = signature.strip()
         clean_pat = pattern.strip()
         clean_reason = reason.strip()
+
+        if expires_in_days is not None and expires_in_days > 0 and expires_at is None:
+            expires_at = datetime.now(timezone.utc).timestamp() + expires_in_days * 86400.0
 
         # Compute neural embedding over signature, pattern, and reason
         embed_payload = f"{clean_sig} {clean_pat} {clean_reason}"
@@ -66,7 +108,8 @@ class InhibitoryGate:
             valence=ValenceType.INHIBITORY,
             project_root=project_root.strip() if project_root else None,
             is_active=True,
-            embedding=vec
+            embedding=vec,
+            expires_at=expires_at
         )
 
         conn = self.db.get_connection()
@@ -76,8 +119,8 @@ class InhibitoryGate:
                 INSERT INTO anti_memories (
                     id, signature, pattern, reason, suggested_fix, context_tags,
                     times_triggered, severity, created_at, last_seen,
-                    valence, project_root, is_active, embedding
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    valence, project_root, is_active, embedding, expires_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(signature) DO UPDATE SET
                     pattern = excluded.pattern,
                     reason = excluded.reason,
@@ -87,7 +130,8 @@ class InhibitoryGate:
                     last_seen = excluded.last_seen,
                     project_root = excluded.project_root,
                     is_active = 1,
-                    embedding = excluded.embedding
+                    embedding = excluded.embedding,
+                    expires_at = excluded.expires_at
                 """,
                 (
                     anti_memory.id,
@@ -103,11 +147,12 @@ class InhibitoryGate:
                     anti_memory.valence.value,
                     anti_memory.project_root,
                     1 if anti_memory.is_active else 0,
-                    vec_json
+                    vec_json,
+                    anti_memory.expires_at
                 )
             )
 
-        logger.info("Recorded anti-memory '%s' (project: %s)", clean_sig, project_root)
+        logger.info("Recorded anti-memory '%s' (project: %s, expires_at: %s)", clean_sig, project_root, expires_at)
         return anti_memory
 
     def check_action(
@@ -126,21 +171,25 @@ class InhibitoryGate:
         normalized_action = action.strip()
         combined_text = f"{context} {normalized_action}".lower()
 
-        # SQL level filter: Only active anti-memories for this project (or global)
+        now = datetime.now(timezone.utc).timestamp()
+        # SQL level filter: Only active, non-expired anti-memories for this project (or global)
         if project_root:
             query = """
                 SELECT * FROM anti_memories 
-                WHERE is_active = 1 AND (project_root IS NULL OR project_root = ?)
+                WHERE is_active = 1 
+                  AND (project_root IS NULL OR project_root = ?)
+                  AND (expires_at IS NULL OR expires_at > ?)
                 ORDER BY times_triggered DESC
             """
-            rows = conn.execute(query, (project_root.strip(),)).fetchall()
+            rows = conn.execute(query, (project_root.strip(), now)).fetchall()
         else:
             query = """
                 SELECT * FROM anti_memories 
                 WHERE is_active = 1
+                  AND (expires_at IS NULL OR expires_at > ?)
                 ORDER BY times_triggered DESC
             """
-            rows = conn.execute(query).fetchall()
+            rows = conn.execute(query, (now,)).fetchall()
 
         if not rows:
             return InhibitionResult(passed=True)
@@ -163,9 +212,17 @@ class InhibitoryGate:
             # Tier 2: Neural Dense Vector Semantic Matching (eliminates regex brittleness)
             if not is_match and anti_mem.embedding and action_vec:
                 sim = EmbeddingEngine.cosine_similarity(action_vec, anti_mem.embedding)
-                if sim >= self.semantic_threshold:
+                # Read-only operations require much higher similarity to trigger a block,
+                # preventing false positives on diagnostic commands like SELECT, ls, cat, grep.
+                effective_threshold = (
+                    _READ_ONLY_THRESHOLD
+                    if _is_read_only_intent(normalized_action)
+                    else self.semantic_threshold
+                )
+                if sim >= effective_threshold:
                     is_match = True
                     match_source = f"semantic_similarity ({sim:.2f})"
+
 
             # Fallback legacy regex check for explicit pattern expressions
             if not is_match and any(c in REGEX_CHARS for c in pattern):
@@ -274,10 +331,11 @@ class InhibitoryGate:
     @staticmethod
     def _row_to_anti_memory(r) -> AntiMemory:
         context_tags = json.loads(r["context_tags"]) if r["context_tags"] else []
-        project_root = r["project_root"] if "project_root" in r else None
-        is_active = bool(r["is_active"]) if "is_active" in r else True
-        valence = ValenceType(r["valence"]) if ("valence" in r and r["valence"]) else ValenceType.INHIBITORY
-        embedding = json.loads(r["embedding"]) if ("embedding" in r and r["embedding"]) else None
+        project_root = r["project_root"] if "project_root" in r.keys() else None
+        is_active = bool(r["is_active"]) if "is_active" in r.keys() else True
+        valence = ValenceType(r["valence"]) if ("valence" in r.keys() and r["valence"]) else ValenceType.INHIBITORY
+        embedding = json.loads(r["embedding"]) if ("embedding" in r.keys() and r["embedding"]) else None
+        expires_at = float(r["expires_at"]) if ("expires_at" in r.keys() and r["expires_at"] is not None) else None
 
         return AntiMemory(
             id=r["id"],
@@ -293,5 +351,6 @@ class InhibitoryGate:
             valence=valence,
             project_root=project_root,
             is_active=is_active,
-            embedding=embedding
+            embedding=embedding,
+            expires_at=expires_at
         )

@@ -8,18 +8,18 @@ from pathlib import Path
 
 import pytest
 
-from smriti.config import SmritiConfig
-from smriti.engine.stream import StreamBuffer
-from smriti.models import ActionStatus
-from smriti.storage.db import DatabaseManager
+from smruti.config import smrutiConfig
+from smruti.engine.stream import StreamBuffer
+from smruti.models import ActionStatus
+from smruti.storage.db import DatabaseManager
 
 
 @pytest.fixture
 def temp_db():
     with tempfile.TemporaryDirectory() as tmpdir:
-        config = SmritiConfig(
+        config = smrutiConfig(
             project_dir=Path(tmpdir),
-            db_filename="test_smriti.db"
+            db_filename="test_smruti.db"
         )
         db = DatabaseManager(config)
         try:

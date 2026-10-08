@@ -7,10 +7,12 @@ import json
 import logging
 from datetime import datetime, timezone
 
-from smriti.config import SmritiConfig, get_config
-from smriti.models import CorticalRule, RuleEdge, ValenceType
-from smriti.storage.db import DatabaseManager, get_db
-from smriti.storage.embeddings import EmbeddingEngine, get_embedding_engine
+import numpy as np
+
+from smruti.config import smrutiConfig, get_config
+from smruti.models import CorticalRule, RuleEdge, ValenceType
+from smruti.storage.db import DatabaseManager, get_db
+from smruti.storage.embeddings import EmbeddingEngine, get_embedding_engine
 
 logger = logging.getLogger(__name__)
 
@@ -18,12 +20,13 @@ class Cortex:
     def __init__(
         self,
         db: DatabaseManager | None = None,
-        config: SmritiConfig | None = None,
+        config: smrutiConfig | None = None,
         embedding_engine: EmbeddingEngine | None = None
     ):
         self.config = config or get_config()
         self.db = db or get_db(self.config)
         self.embeddings = embedding_engine or get_embedding_engine(self.config.embedding_model)
+        self._vec_cache: dict[str, list[float]] = {}
 
     def add_rule(
         self,
@@ -185,6 +188,31 @@ class Cortex:
         rules_by_id: dict[str, CorticalRule] = {}
         base_scores: dict[str, float] = {}
 
+        # Vectorized batch similarity calculation
+        sims_by_id: dict[str, float] = {}
+        if has_query and query_vec:
+            vec_list: list[list[float]] = []
+            id_list: list[str] = []
+            for r in rows:
+                rid = r["id"]
+                if rid in self._vec_cache:
+                    v = self._vec_cache[rid]
+                elif r["embedding"]:
+                    v = json.loads(r["embedding"])
+                    self._vec_cache[rid] = v
+                else:
+                    v = None
+
+                if v:
+                    vec_list.append(v)
+                    id_list.append(rid)
+
+            if vec_list:
+                matrix = np.asarray(vec_list, dtype=np.float32)
+                sims = EmbeddingEngine.batch_cosine_similarity(query_vec, matrix)
+                for rid, sim in zip(id_list, sims):
+                    sims_by_id[rid] = float(sim)
+
         for r in rows:
             rule = self._row_to_rule(r)
             rules_by_id[rule.id] = rule
@@ -196,18 +224,10 @@ class Cortex:
 
             relevance = 1.0
             if has_query and query_vec:
-                rule_vec = rule.embedding
-                if not rule_vec and r["embedding"]:
-                    rule_vec = json.loads(r["embedding"])
-                
-                if rule_vec:
-                    sem_sim = EmbeddingEngine.cosine_similarity(query_vec, rule_vec)
-                    # Normalize semantic similarity from [-1, 1] to [0, 1]
-                    sem_score = max(0.0, sem_sim)
-                else:
-                    sem_score = 0.0
+                sem_sim = sims_by_id.get(rule.id, 0.0)
+                sem_score = max(0.0, sem_sim)
 
-                # Subtle lexical overlap bonus
+                # Lexical overlap bonus
                 lex_matches = sum(1 for t in query_terms if t in rule.rule_text.lower() or t in rule.category.lower())
                 lex_bonus = min(0.4, lex_matches * 0.15)
 

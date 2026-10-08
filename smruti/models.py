@@ -1,5 +1,5 @@
 """
-models.py - Pydantic schemas and data contracts for Smriti memory engine.
+models.py - Pydantic schemas and data contracts for smruti memory engine.
 """
 
 import uuid
@@ -57,6 +57,8 @@ class AntiMemory(BaseModel):
     project_root: str | None = None
     is_active: bool = True
     embedding: list[float] | None = None
+    expires_at: float | None = None
+
 
 class CorticalRule(BaseModel):
     """Tier 3A: Positive heuristic rule with biological decay and reinforcement."""

@@ -7,15 +7,15 @@ from pathlib import Path
 
 import pytest
 
-from smriti.config import SmritiConfig
-from smriti.engine.cortex import Cortex
-from smriti.storage.db import DatabaseManager
+from smruti.config import smrutiConfig
+from smruti.engine.cortex import Cortex
+from smruti.storage.db import DatabaseManager
 
 
 @pytest.fixture
 def cortex():
     with tempfile.TemporaryDirectory() as tmpdir:
-        config = SmritiConfig(
+        config = smrutiConfig(
             project_dir=Path(tmpdir),
             db_filename="test_decay.db",
             default_decay_rate=0.1,  # 10% per hour

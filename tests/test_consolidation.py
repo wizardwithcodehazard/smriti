@@ -7,19 +7,19 @@ from pathlib import Path
 
 import pytest
 
-from smriti.config import SmritiConfig
-from smriti.engine.consolidator import Consolidator
-from smriti.engine.cortex import Cortex
-from smriti.engine.inhibitory import InhibitoryGate
-from smriti.engine.stream import StreamBuffer
-from smriti.models import ActionStatus
-from smriti.storage.db import DatabaseManager
+from smruti.config import smrutiConfig
+from smruti.engine.consolidator import Consolidator
+from smruti.engine.cortex import Cortex
+from smruti.engine.inhibitory import InhibitoryGate
+from smruti.engine.stream import StreamBuffer
+from smruti.models import ActionStatus
+from smruti.storage.db import DatabaseManager
 
 
 @pytest.fixture
 def memory_system():
     with tempfile.TemporaryDirectory() as tmpdir:
-        config = SmritiConfig(
+        config = smrutiConfig(
             project_dir=Path(tmpdir),
             db_filename="test_consolidation.db",
             default_decay_rate=0.1,

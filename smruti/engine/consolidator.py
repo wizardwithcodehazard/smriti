@@ -12,13 +12,13 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Any
 
-from smriti.config import SmritiConfig, get_config
-from smriti.engine.cortex import Cortex
-from smriti.engine.inhibitory import InhibitoryGate
-from smriti.engine.llm import LLMClient
-from smriti.engine.stream import StreamBuffer
-from smriti.models import ActionStatus, Episode
-from smriti.storage.db import DatabaseManager, get_db
+from smruti.config import smrutiConfig, get_config
+from smruti.engine.cortex import Cortex
+from smruti.engine.inhibitory import InhibitoryGate
+from smruti.engine.llm import LLMClient
+from smruti.engine.stream import StreamBuffer
+from smruti.models import ActionStatus, Episode
+from smruti.storage.db import DatabaseManager, get_db
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ class Consolidator:
     def __init__(
         self,
         db: DatabaseManager | None = None,
-        config: SmritiConfig | None = None,
+        config: smrutiConfig | None = None,
         stream: StreamBuffer | None = None,
         inhibitory: InhibitoryGate | None = None,
         cortex: Cortex | None = None,
@@ -55,6 +55,7 @@ class Consolidator:
         4. Marks analyzed episodes as consolidated (idempotent execution).
         5. Enforces raw_retention_days cleanup on old consolidated episodes.
         6. Sweeps decaying dormant rules.
+        7. Prunes TTL-expired inhibitory anti-memories.
         """
         now = current_time or datetime.now(timezone.utc).timestamp()
         
@@ -67,12 +68,14 @@ class Consolidator:
                 self.config.raw_retention_days * 86400.0,
                 only_consolidated=True
             )
+            pruned_anti = self._prune_expired_anti_memories(now)
             return {
                 "processed_episodes": 0,
                 "promoted_anti_memories": 0,
                 "promoted_positive_rules": 0,
                 "pruned_decayed_rules": pruned_rules,
                 "pruned_raw_episodes": pruned_raw,
+                "pruned_expired_anti_memories": pruned_anti,
                 "timestamp": now
             }
 
@@ -173,12 +176,16 @@ class Consolidator:
         # 6. Sweep biologically decayed rules
         pruned_rules = self.cortex.prune_decayed_rules(current_time=now)
 
+        # 7. Expire TTL-bound anti-memories (single SQL DELETE, O(1))
+        pruned_anti = self._prune_expired_anti_memories(now)
+
         return {
             "processed_episodes": len(episodes),
             "promoted_anti_memories": promoted_anti_memories,
             "promoted_positive_rules": promoted_rules,
             "pruned_decayed_rules": pruned_rules,
             "pruned_raw_episodes": pruned_raw,
+            "pruned_expired_anti_memories": pruned_anti,
             "timestamp": now
         }
 
@@ -197,3 +204,16 @@ class Consolidator:
     def _slugify(text: str) -> str:
         """Creates safe alphanumeric identifier."""
         return re.sub(r"[^a-zA-Z0-9_]+", "_", text).strip("_").lower()
+
+    def _prune_expired_anti_memories(self, now: float) -> int:
+        """Deletes anti-memories whose expires_at timestamp has passed. O(1) single SQL DELETE."""
+        conn = self.db.get_connection()
+        with conn:
+            cur = conn.execute(
+                "DELETE FROM anti_memories WHERE expires_at IS NOT NULL AND expires_at < ?",
+                (now,)
+            )
+        pruned = cur.rowcount
+        if pruned:
+            logger.info("Pruned %d TTL-expired anti-memories.", pruned)
+        return pruned

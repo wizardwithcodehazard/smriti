@@ -113,6 +113,29 @@ class EmbeddingEngine:
         sim = float(np.dot(a, b) / (norm_a * norm_b))
         return max(-1.0, min(1.0, sim))
 
+    @staticmethod
+    def batch_cosine_similarity(query_vec: list[float] | np.ndarray, matrix: np.ndarray) -> np.ndarray:
+        """
+        Computes cosine similarities between one query vector and an N x D matrix of rule vectors.
+        Executes in a single optimized C/BLAS matrix-vector product.
+        Returns 1D array of similarities in [-1.0, 1.0].
+        """
+        if matrix.size == 0:
+            return np.array([], dtype=np.float32)
+        q = np.asarray(query_vec, dtype=np.float32)
+        q_norm = float(np.linalg.norm(q))
+        if q_norm == 0.0:
+            return np.zeros(matrix.shape[0], dtype=np.float32)
+        q_unit = q / q_norm
+
+        m_norms = np.linalg.norm(matrix, axis=1)
+        m_norms[m_norms == 0.0] = 1e-9
+
+        dots = np.dot(matrix, q_unit)
+        sims = dots / m_norms
+        return np.clip(sims, -1.0, 1.0)
+
+
 _global_embedding_engine: EmbeddingEngine | None = None
 
 def get_embedding_engine(model_name: str | None = None) -> EmbeddingEngine:

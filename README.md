@@ -1,8 +1,8 @@
-# Smriti (स्मृति)
+# smruti (स्मृति)
 
 > **Biologically Inspired, Dual-Valence Cognitive Memory for Autonomous AI Agents**
 
-Smriti equips autonomous coding and reasoning agents with an active, biological memory architecture:
+smruti equips autonomous coding and reasoning agents with an active, biological memory architecture:
 
 1. **Tier 1 (Episodic Working Stream):** Sub-millisecond, append-only SQLite WAL stream. Zero LLM latency while acting.
 2. **Tier 2 (The "Sleep" Consolidation Engine):** Periodic background distillation that strips 90% verbatim token noise into schemas and rules.
@@ -21,18 +21,18 @@ pip install -e .
 
 ### CLI Inspection
 ```bash
-smriti init      # Initialize .smriti/ database in your project
-smriti status    # View positive rules, anti-memories, and decay health
-smriti sleep     # Run offline consolidation over recent episodes
-smriti audit     # Inspect chronological agent trajectories
+smruti init      # Initialize .smruti/ database in your project
+smruti status    # View positive rules, anti-memories, and decay health
+smruti sleep     # Run offline consolidation over recent episodes
+smruti audit     # Inspect chronological agent trajectories
 ```
 
 ### MCP (Model Context Protocol) Server for Cursor / Claude Code / Antigravity
 Add to your MCP configuration (`mcpServers`):
 ```json
 {
-  "smriti": {
-    "command": "smriti",
+  "smruti": {
+    "command": "smruti",
     "args": ["mcp"]
   }
 }

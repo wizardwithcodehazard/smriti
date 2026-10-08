@@ -12,7 +12,8 @@ venv/
 env/
 ENV/
 
-# Smriti local workspace database
+# smruti local workspace database
+.smruti/
 .smriti/
 *.db
 *.db-wal

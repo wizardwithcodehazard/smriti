@@ -8,18 +8,18 @@ import time
 
 import pytest
 
-from smriti.config import SmritiConfig
-from smriti.engine.consolidator import Consolidator
-from smriti.engine.cortex import Cortex
-from smriti.engine.inhibitory import InhibitoryGate
-from smriti.engine.stream import StreamBuffer
-from smriti.models import ActionStatus
-from smriti.storage.db import DatabaseManager, close_all_dbs
+from smruti.config import smrutiConfig
+from smruti.engine.consolidator import Consolidator
+from smruti.engine.cortex import Cortex
+from smruti.engine.inhibitory import InhibitoryGate
+from smruti.engine.stream import StreamBuffer
+from smruti.models import ActionStatus
+from smruti.storage.db import DatabaseManager, close_all_dbs
 
 
 @pytest.fixture
 def test_env(tmp_path):
-    config = SmritiConfig(
+    config = smrutiConfig(
         project_dir=tmp_path,
         db_filename="test_advanced.db",
         dedup_similarity_threshold=0.80,

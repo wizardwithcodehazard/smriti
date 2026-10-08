@@ -11,9 +11,9 @@ import threading
 import time
 from typing import Any
 
-from smriti.config import SmritiConfig, get_config
-from smriti.models import ActionStatus, Episode
-from smriti.storage.db import DatabaseManager, get_db
+from smruti.config import smrutiConfig, get_config
+from smruti.models import ActionStatus, Episode
+from smruti.storage.db import DatabaseManager, get_db
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ class StreamBuffer:
     def __init__(
         self,
         db: DatabaseManager | None = None,
-        config: SmritiConfig | None = None,
+        config: smrutiConfig | None = None,
         auto_consolidate: bool = True
     ):
         self.config = config or get_config()
@@ -106,7 +106,7 @@ class StreamBuffer:
 
         def _worker():
             try:
-                from smriti.engine.consolidator import Consolidator
+                from smruti.engine.consolidator import Consolidator
                 consolidator = Consolidator(db=self.db, config=self.config, stream=self)
                 report = consolidator.sleep(session_id=session_id)
                 logger.info(
@@ -121,7 +121,7 @@ class StreamBuffer:
                 with self._consolidate_lock:
                     self._consolidating = False
 
-        thread = threading.Thread(target=_worker, name="SmritiAutonomicSleep", daemon=True)
+        thread = threading.Thread(target=_worker, name="smrutiAutonomicSleep", daemon=True)
         self._active_worker = thread
         thread.start()
 
