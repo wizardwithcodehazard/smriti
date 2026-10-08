@@ -54,13 +54,13 @@ def smriti_preflight_check(action: str, context: str = "", project_root: str | N
     res = inhibitory.check_action(action, context, project_root=project_root)
     if not res.passed:
         return (
-            f"🚫 [BLOCKED BY SMRITI INHIBITORY GATE]\n"
+            f"[BLOCKED BY SMRITI INHIBITORY GATE]\n"
             f"Signature: {res.matched_signature}\n"
             f"Severity: {res.severity.upper()}\n"
             f"Reason: {res.reason}\n"
             f"Suggested Fix: {res.suggested_fix or 'Change parameters to avoid known dead end.'}"
         )
-    return "✅ [PASSED] No known failure signatures detected."
+    return "[PASSED] No known failure signatures detected."
 
 @mcp.tool()
 def smriti_record_episode(
@@ -121,7 +121,7 @@ def smriti_recall_heuristics(query: str = "", limit: int = 5) -> str:
     if not recalled:
         return "No relevant cortical rules found in active memory."
 
-    lines = ["🧠 [SMRITI RECALLED HEURISTICS]"]
+    lines = ["[SMRITI RECALLED HEURISTICS]"]
     for i, (rule, score) in enumerate(recalled, 1):
         lines.append(
             f"{i}. [{rule.category}] {rule.rule_text} "
@@ -139,12 +139,12 @@ def smriti_trigger_sleep(project_root: str | None = None) -> str:
     _, _, _, consolidator = _get_engine()
     report = consolidator.sleep(project_root=project_root)
     return (
-        f"🌙 [CONSOLIDATION CYCLE COMPLETE]\n"
-        f"• Episodes Analyzed: {report['processed_episodes']}\n"
-        f"• New Anti-Memories Promoted: {report['promoted_anti_memories']}\n"
-        f"• Positive Rules Promoted: {report['promoted_positive_rules']}\n"
-        f"• Decayed Rules Pruned: {report['pruned_decayed_rules']}\n"
-        f"• Historical Episodes Cleared: {report['pruned_raw_episodes']}"
+        f"[CONSOLIDATION CYCLE COMPLETE]\n"
+        f"- Episodes Analyzed: {report['processed_episodes']}\n"
+        f"- New Anti-Memories Promoted: {report['promoted_anti_memories']}\n"
+        f"- Positive Rules Promoted: {report['promoted_positive_rules']}\n"
+        f"- Decayed Rules Pruned: {report['pruned_decayed_rules']}\n"
+        f"- Historical Episodes Cleared: {report['pruned_raw_episodes']}"
     )
 
 @mcp.tool()
@@ -178,11 +178,11 @@ def smriti_list_anti_memories(project_root: str | None = None) -> str:
     if not memories:
         return "No active inhibitory anti-memories found."
 
-    lines = [f"🛡️ [ACTIVE SMRITI ANTI-MEMORIES] ({len(memories)} total)"]
+    lines = [f"[ACTIVE SMRITI ANTI-MEMORIES] ({len(memories)} total)"]
     for m in memories:
         scope = f" [project: {m.project_root}]" if m.project_root else " [global]"
         fix = f" | Fix: {m.suggested_fix}" if m.suggested_fix else ""
-        lines.append(f"• [{m.signature}] pattern: '{m.pattern}' (triggered: {m.times_triggered}x){scope}{fix}")
+        lines.append(f"- [{m.signature}] pattern: '{m.pattern}' (triggered: {m.times_triggered}x){scope}{fix}")
     return "\n".join(lines)
 
 def run_server():
