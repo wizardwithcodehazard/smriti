@@ -121,6 +121,46 @@ def audit(limit: int = typer.Option(10, help="Number of recent episodes to show"
         _safe_echo(f"  [{status_icon}] ({ep.status.value.upper()}) {ep.action[:50]} -> {ep.result[:50]} {cons_mark}")
 
 @app.command()
+def preflight(
+    action: str = typer.Argument(..., help="Command or action to check against inhibitory anti-memories"),
+    context: str = typer.Option("", help="Optional execution context or intent"),
+    project_root: str | None = typer.Option(None, help="Optional project directory scope")
+):
+    """Checks an action against the Tier 3B inhibitory gate before execution."""
+    config = get_config()
+    db = get_db(config)
+    inhibitory = InhibitoryGate(db)
+    res = inhibitory.check_action(action=action, context=context, project_root=project_root)
+    if not res.passed:
+        _safe_echo("[BLOCKED BY SMRITI INHIBITORY GATE]")
+        _safe_echo(f"  * Signature: {res.matched_signature}")
+        _safe_echo(f"  * Severity: {res.severity.upper()}")
+        _safe_echo(f"  * Reason: {res.reason}")
+        if res.suggested_fix:
+            _safe_echo(f"  * Suggested Fix: {res.suggested_fix}")
+        sys.exit(1)
+    else:
+        _safe_echo("[PASSED] No known failure signatures detected.")
+
+@app.command()
+def recall(
+    query: str = typer.Argument("", help="Search query or keyword for cortical rules"),
+    limit: int = typer.Option(5, help="Maximum number of rules to recall")
+):
+    """Recalls active cortical rules weighted by dense vector similarity and Ebbinghaus strength."""
+    config = get_config()
+    db = get_db(config)
+    cortex = Cortex(db, config)
+    recalled = cortex.recall_rules(query=query, limit=limit, reinforce=True)
+    if not recalled:
+        _safe_echo("No relevant cortical rules found in active memory.")
+        return
+
+    _safe_echo(f"[SMRITI RECALLED HEURISTICS] ({len(recalled)} rules):")
+    for i, (rule, score) in enumerate(recalled, 1):
+        _safe_echo(f"  {i}. [{rule.category}] {rule.rule_text} (strength: {score:.2f}, hits: {rule.access_count})")
+
+@app.command()
 def mcp():
     """Runs the FastMCP server over standard I/O for Cursor / Claude Code / Antigravity."""
     from smriti.interfaces.mcp_server import run_server
