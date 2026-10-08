@@ -1,0 +1,31 @@
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.ruff_cache/
+
+# Virtual Environment
+.venv/
+venv/
+env/
+ENV/
+
+# Smriti local workspace database
+.smriti/
+*.db
+*.db-wal
+*.db-shm
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+*.whl
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
