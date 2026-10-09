@@ -37,22 +37,41 @@ class smrutiConfig:
     backend_type: str = "sqlite"
     postgres_url: str | None = None
 
+    # SQLite concurrency & write retry settings
+    busy_timeout_ms: int = 5000
+    write_max_retries: int = 5
+    write_base_delay: float = 0.02
+    write_max_delay: float = 0.5
+    use_queue_worker: bool = True
+    queue_batch_size: int = 100
+
 
     @property
     def smruti_dir(self) -> Path:
-        """Finds .smruti in current working directory or ancestors, else creates in cwd or home directory."""
+        """Finds .smruti in current working directory or ancestors, else creates in cwd, home directory, or temp directory."""
         import os
+        import tempfile
         env_dir = os.environ.get("SMRUTI_DIR")
         if env_dir:
             return Path(env_dir).resolve()
+
+        def _safe_fallback() -> Path:
+            try:
+                home = Path.home()
+                if home != Path("/") and os.access(home, os.W_OK):
+                    return home / self.smruti_dir_name
+            except Exception:
+                pass
+            return Path(tempfile.gettempdir()) / self.smruti_dir_name
+
         current = self.project_dir.resolve()
         if current == Path("/"):
-            return Path.home() / self.smruti_dir_name
+            return _safe_fallback()
         nearest = current
         while not nearest.exists() and nearest != nearest.parent:
             nearest = nearest.parent
         if nearest == Path("/") or not os.access(nearest, os.W_OK):
-            return Path.home() / self.smruti_dir_name
+            return _safe_fallback()
         for parent in [current, *current.parents]:
             candidate = parent / self.smruti_dir_name
             if candidate.is_dir():

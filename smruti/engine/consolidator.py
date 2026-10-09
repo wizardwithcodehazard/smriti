@@ -208,7 +208,7 @@ class Consolidator:
     def _prune_expired_anti_memories(self, now: float) -> int:
         """Deletes anti-memories whose expires_at timestamp has passed. O(1) single SQL DELETE."""
         conn = self.db.get_connection()
-        with conn:
+        with self.db.write_transaction(conn):
             cur = conn.execute(
                 "DELETE FROM anti_memories WHERE expires_at IS NOT NULL AND expires_at < ?",
                 (now,)

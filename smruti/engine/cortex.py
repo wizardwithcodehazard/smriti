@@ -107,7 +107,7 @@ class Cortex:
             else:
                 merged_sources = prev_sources
 
-            with conn:
+            with self.db.write_transaction(conn):
                 conn.execute(
                     """
                     UPDATE cortical_rules
@@ -143,7 +143,7 @@ class Cortex:
             source_episode_ids=source_episode_ids or []
         )
 
-        with conn:
+        with self.db.write_transaction(conn):
             conn.execute(
                 """
                 INSERT INTO cortical_rules (
@@ -358,7 +358,7 @@ class Cortex:
 
         # 4. Apply Hebbian potentiation to recalled memories
         if reinforce and top_rules:
-            with conn:
+            with self.db.write_transaction(conn):
                 for rule, _ in top_rules:
                     new_strength = min(1.0, rule.base_strength + self.config.reinforcement_boost)
                     rule.access_count += 1
@@ -384,7 +384,7 @@ class Cortex:
         rows = conn.execute("SELECT * FROM cortical_rules").fetchall()
 
         pruned_count = 0
-        with conn:
+        with self.db.write_transaction(conn):
             for r in rows:
                 rule = self._row_to_rule(r)
                 strength = rule.calculate_effective_strength(
@@ -401,7 +401,7 @@ class Cortex:
     def forget_rule(self, rule_id: str) -> bool:
         """Explicitly forgets / deletes a cortical rule by ID."""
         conn = self.db.get_connection()
-        with conn:
+        with self.db.write_transaction(conn):
             cur = conn.execute("DELETE FROM cortical_rules WHERE id = ?", (rule_id,))
             conn.execute("DELETE FROM rule_edges WHERE rule_id_a = ? OR rule_id_b = ?", (rule_id, rule_id))
             return cur.rowcount > 0
@@ -434,7 +434,7 @@ class Cortex:
     def _create_edge(self, id_a: str, id_b: str, weight: float, created_at: float):
         """Creates bidirectional edge in rule_edges graph."""
         conn = self.db.get_connection()
-        with conn:
+        with self.db.write_transaction(conn):
             conn.execute(
                 """
                 INSERT INTO rule_edges (rule_id_a, rule_id_b, weight, created_at)
